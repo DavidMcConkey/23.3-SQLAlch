@@ -1,7 +1,7 @@
 """Blogly application."""
 
 from flask import Flask, render_template, request, redirect, flash
-from models import db, connect_db,User,Post
+from models import db, connect_db,User,Post, Tag
 from flask_debugtoolbar import DebugToolbarExtension
 
 app = Flask(__name__)
@@ -87,13 +87,16 @@ def page_missing(evt):
 def new_post(user_id):
     """Displays page for new post"""
     user = User.query.get_or_404(user_id)
-    return render_template('new_post.html', user=user)
+    tags = Tag.query.all()
+    return render_template('new_post.html', user=user, tags=tags)
 
 @app.route('/users/<int:user_id>/posts/new', methods=['POST'])
 def new_post_post(user_id):
     """Handle add form, add post and redirect to details page"""
     user = User.query.get_or_404(user_id)
-    new_post = Post(title = request.form['title'], content = request.form['content'],user=user)
+    tag_ids = [int(num) for num in request.form.getlist('tags')]
+    tags = Tag.query.filter(Tag.id.in_(tag_ids)).all()
+    new_post = Post(title = request.form['title'], content = request.form['content'],user=user, tags=tags)
 
     db.session.add(new_post)
     db.session.commit()
@@ -110,7 +113,8 @@ def show_posts(post_id):
 def posts_edit(post_id):
     """Displays form for editing posts"""
     post = Post.query.get_or_404(post_id)
-    return render_template('post_edit.html', post = post)
+    tags = Tag.query.all()
+    return render_template('post_edit.html', post = post, tags=tags)
 
 @app.route('/posts/<int:post_id>/edit', methods=["POST"])
 def update_post(post_id):
@@ -118,6 +122,10 @@ def update_post(post_id):
     post = Post.query.get_or_404(post_id)
     post.title = request.form['title']
     post.content = request.form['content']
+
+    tag_ids = [int(num) for num in request.form.getlist("tags")]
+    post.tags = Tag.query.filter(Tag.id.in_(tag_ids)).all()
+
 
     db.session.add(post)
     db.session.commit()
@@ -135,3 +143,73 @@ def posts_destroy(post_id):
     flash(f"Post '{post.title} deleted.")
 
     return redirect(f"/users/{post.user_id}")
+
+@app.route('/tags')
+def index_tags():
+    """Shows page with all info on tags"""
+
+    tags = Tag.query.all()
+    return render_template('main_tag.html', tags=tags)
+
+@app.route('/tags/new')
+def new_tag_form():
+    """Displays form for creating new tag"""
+
+    posts = Post.query.all()
+    return render_template('new_tag.html', posts=posts)
+
+@app.route('/tags/new', methods=["POST"])
+def tags_new():
+    """Handles submission for creating new tag"""
+
+    post_ids = [int(num) for num in request.form.getlist('posts')]
+    posts = Post.query.filter(Post.id.in_(post_ids)).all()
+    new_tag = Tag(name = request.form['name'], posts=posts)
+
+    db.session.add(new_tag)
+    db.session.commit()
+    flash(f"Tag '{new_tag.name}' has been added!")
+
+    return redirect('/tags')
+
+@app.route('/tags/<int:tag_id>')
+def show_tags(tag_id):
+    """Displays page with info on tag"""
+
+    tag = Tag.query.get_or_404(tag_id)
+    return render_template('tag_show.html', tag=tag)
+
+@app.route('/tags/<int:tag_id>/edit')
+def tags_edit_form(tag_id):
+    """Shows form to edit existing tag"""
+
+    tag = Tag.query.get_or_404(tag_id)
+    posts = Post.query.all()
+    return render_template('tag_edit.html', tag=tag,posts=posts)
+
+@app.route('/tags/<int:tag_id>/edit', methods=["POST"])
+def tag_edit(tag_id):
+    """Handles submission for updating existing tag"""
+
+    tag = Tag.query.get_or_404(tag_id)
+    tag.name = request.form['name']
+    post_ids = [int(num) for num in request.form.getlist('posts')]
+    tag.posts = Post.query.filter(Post.id.in_(post_ids)).all()
+
+    db.session.add(tag)
+    db.session.commit()
+    flash(f"Tag '{tag.name}' has been edited!")
+
+    return redirect('/tags')
+
+@app.route('/tags/<int:tag_id>/delete', methods=['POST'])
+def delete_tag(tag_id):
+    """Handles form submission for deleting a tag"""
+
+    tag = Tag.query.get_or_404(tag_id)
+    db.session.delete(tag)
+    db.session.commit()
+    flash(f"Tag '{tag.name}' has been deleted!")
+
+    return redirect('/tags')
+    

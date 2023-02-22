@@ -47,6 +47,27 @@ class Post(db.Model):
         """Returns nice looking date"""
         return self.created_at.strftime("%a %b %-d  %Y, %-I:%M %p")
 
+class PostTag(db.Model):
+    """Joins together Post and Tag"""
+
+    __tablename__ = "posts_tags"
+
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), primary_key = True)
+
+    tag_id = db.Column(db.Integer, db.ForeignKey('tags.id'), primary_key = True)
+
+class Tag(db.Model):
+    """Tags"""
+
+    __tablename__ = 'tags'
+
+    id = db.Column(db.Integer, primary_key = True, autoincrement = True)
+
+    name = db.Column(db.Text, unique=True)
+
+    posts = db.relationship('Post',secondary = 'posts_tags',cascade = "all,delete",backref="tags" )
+
+
         
 def connect_db(app):
     """Conect to database"""
